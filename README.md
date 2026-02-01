@@ -303,7 +303,7 @@ var x 5
 var y 10
 
 cmp x y
-lj smaller
+lj "smaller"
 
 print "x is bigger"
 jmp end

@@ -398,7 +398,9 @@ def lexer(lexcode):
         #print(vars)
         
 
-
+if len(sys.argv) < 2:
+    print("ERR: not enough args")
+    exit()
 lexer(ParseStart(open(sys.argv[1]).read()))
 
 #print(type(machine(r"hello everyonee\b \nit is a nice\tday! \\")))

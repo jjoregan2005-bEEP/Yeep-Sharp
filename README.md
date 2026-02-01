@@ -17,14 +17,6 @@ This document explains the repository structure, how to run scripts, and provide
 ├── test2.ysh      # Additional example script
 ```
 
-.
-├── LICENSE        # Project license
-├── ypsh           # Yeep-Sharp interpreter (Python script)
-├── test.ysh       # Example Yeep-Sharp script
-├── test2.ysh      # Additional example script
-
-````
-
 ---
 
 ##  Installation

@@ -152,7 +152,7 @@ Appends the value of `name` to `greeting`.
 
 ---
 
-## ⌨ Input
+##  Input
 
 ```ysh
 inp x 0

@@ -1,0 +1,25 @@
+arryset test
+var hi 2
+arryadd test hi
+var hi 5
+arryadd test hi
+print test
+var i 0
+var length 0
+arrylen length test
+loop:
+cmp length i
+ej "exit"
+arryfet test1 test i
+cmp test1 5
+ej "pop"
+jmp "cont"
+pop:
+arrypop test i
+jmp "cont"
+cont:
+add i 1
+jmp "loop"
+exit:
+print test
+print "done!"

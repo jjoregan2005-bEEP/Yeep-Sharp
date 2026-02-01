@@ -1,0 +1,404 @@
+#!/usr/bin/python
+import subprocess
+import sys
+import os
+KEYWORDS = ["var", "print", "call", "jmp", "ret", "nop", "add", "sub", "mul", "div", "inp","cmp","gj","lj","ej","obj","flip","hazbrow","print!","system","read","write","concat","write","arryset","arryadd","arrypop","arryfet","arrylen"]
+def render(chars):
+    buf = []
+    for c in chars:
+        if c == '\b' or c == '\x08':
+            if buf:
+                buf.pop()
+        else:
+            buf.append(c)
+    return "".join(buf)
+
+
+def machine(s: str):
+    Normal = 0
+    Slash = 1
+    State = Normal
+    out = []
+
+    i = 0
+    while i < len(s):
+        c = s[i]
+
+        if State == Normal:
+            if c == "\\":
+                State = Slash
+            else:
+                out.append(c)
+
+        elif State == Slash:
+            if c == 'n':
+                out.append('\n')
+            elif c == 't':
+                out.append('\t')
+            elif c == 'b':
+                out.append('\b')
+            elif c == "\\":
+                out.append("\\")
+            else:
+                print("fah")
+
+            State = Normal
+
+        i += 1
+
+    return(render(out))
+
+
+def is_number(s: str) -> bool:
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
+
+def tokenizer(s: str):
+    lines = s.split("\n")
+    tokens = []
+    for line in lines:
+        tokens.extend(subtok(line))
+    return tokens
+
+
+def subtok(s: str) -> list[str]:
+    parts = []
+    current = []
+    in_quotes = False
+
+    i = 0
+    while i < len(s):
+        c = s[i]
+
+        if c == '"':
+            in_quotes = not in_quotes
+            current.append(c)
+        elif c == ' ' and not in_quotes:
+            if current:
+                parts.append(''.join(current))
+                current = []
+        else:
+            current.append(c)
+        i += 1
+
+    if current:
+        parts.append(''.join(current))
+
+    return parts
+
+
+def identall(tokens):
+    i = 0
+    arry = []
+    while i < len(tokens):
+        arry.append(identify(tokens[i]))
+        i = i + 1
+    return arry  
+
+
+def identify(token):
+    if token[-1] == ":":
+        return ("Label", token[:-1])
+    if token[0] == '"' and token[-1] == '"':
+        return ("String", token[1:-1])  # strip quotes here
+    elif is_number(token):
+        return ("Number", token)
+    elif token in KEYWORDS:
+        return ("Keyword", token)
+    elif token == "EOF":
+        return ("EOF", None)
+    else:
+        return ("Identifier", token)
+
+
+
+def ParseStart(code):
+        return identall(tokenizer(code))
+
+def lexer(lexcode):
+    gt = lt = eq = False
+    vars = {}
+    labels = {}
+    retpos = []
+
+    # --- Pass 1: collect labels ---
+    for idx, (title, val) in enumerate(lexcode):
+        if title == "Label":
+            labels[val] = idx
+
+    # --- Pass 2: execute ---
+    i = 0
+    while i < len(lexcode):
+        title, val = lexcode[i]
+
+        # ----------------------------
+        # Handle Keywords / Instructions
+        # ----------------------------
+        if title == "Keyword":
+
+            # --- no operation ---
+            if val == "nop":
+                pass
+
+            # --- print ---
+            elif val in ("print", "print!") and i + 1 < len(lexcode):
+                next_title, next_val = lexcode[i + 1]
+
+    # Determine whether we should append a newline
+                newline = val == "print"
+
+    # Process the value
+                if next_title == "String":
+                    processed = machine(next_val)
+                    print("".join(processed), end="" if not newline else "\n")
+                elif next_title == "Identifier":
+                    print(vars.get(next_val, f"Undefined variable: {next_val}"), end="" if not newline else "\n")
+                elif next_title == "Number":
+                    print(str(next_val), end="" if not newline else "\n")
+                else:
+                    print("Syntax error: 'print' expects a string or variable", end="" if not newline else "\n")
+
+                i += 1
+
+
+            
+
+            # --- cmp ---
+            elif val == "cmp" and i + 2 < len(lexcode):
+                nt, nv = lexcode[i + 1]
+                nnt, nnv = lexcode[i + 2]
+
+                left = float(vars[nv]) if nt == "Identifier" else float(nv)
+                right = float(vars[nnv]) if nnt == "Identifier" else float(nnv)
+
+                gt, lt, eq = left > right, left < right, left == right
+                i += 2
+
+            # --- var assignment ---
+            elif val == "var" and i + 2 < len(lexcode):
+                name_title, name_val = lexcode[i + 1]
+                value_title, value_val = lexcode[i + 2]
+
+                if name_title != "Identifier":
+                    print("Syntax error: expected variable name after 'var'")
+                else:
+                    if value_title == "String":
+                        vars[name_val] = machine(value_val)
+                    elif value_title == "Number":
+                        vars[name_val] = float(value_val)
+                    elif value_title == "Identifier":
+                        vars[name_val] = vars.get(value_val, 0)
+                    else:
+                        print(f"Syntax error: unexpected token '{value_val}'")
+                i += 2
+
+            # --- arithmetic operations ---
+            elif val in ("add", "sub", "mul", "div") and i + 2 < len(lexcode):
+                name_title, name_val = lexcode[i + 1]
+                value_title, value_val = lexcode[i + 2]
+
+                if name_title != "Identifier":
+                    print(f"Syntax error: expected variable name after '{val}'")
+                else:
+                    a = float(vars.get(name_val, 0))
+                    b = float(vars.get(value_val, 0)) if value_title == "Identifier" else float(value_val)
+
+                    if val == "add":
+                        vars[name_val] = a + b
+                    elif val == "sub":
+                        vars[name_val] = a - b
+                    elif val == "mul":
+                        vars[name_val] = a * b
+                    elif val == "div":
+                        vars[name_val] = a / b
+                i += 2
+            elif val == "concat":
+                name_title, name_val = lexcode[i + 1]
+                value_title, value_val = lexcode[i + 2]
+                if name_title != "Identifier":
+                    print(f"Syntax error: expected variable name after '{val}'")
+                else:
+                    a = machine(str(vars.get(name_val, 0)))
+                    b = machine(str(vars.get(value_val, 0)) if value_title == "Identifier" else str(value_val))
+
+                    vars[name_val] = a + b
+                i = i + 2
+
+            # --- input ---
+            elif val == "inp" and i + 2 < len(lexcode):
+                next_title, next_val = lexcode[i + 1]
+                nnext_title, nnext_val = lexcode[i + 2]
+                if next_title == "Identifier":
+                    if nnext_title == "Number" and float(nnext_val) < 1:
+                        vars[next_val] = input()
+                    else:
+                        vars[next_val] = float(input())
+                else:
+                    print("Syntax error: expected variable name for input")
+                    quit()
+                i += 2
+
+            # --- call ---
+            elif val == "call" and i + 1 < len(lexcode):
+                next_title, next_val = lexcode[i + 1]
+                retpos.append(i + 2)
+                if next_title == "String":
+                    i = labels[next_val]
+                elif next_title == "Identifier":
+                    i = labels.get(vars.get(next_val, ""), i)
+                else:
+                    print("Syntax error: 'call' expects a label name")
+                    break
+                continue  # skip i += 1
+
+            # --- unconditional jump ---
+            elif val == "jmp" and i + 1 < len(lexcode):
+                next_title, next_val = lexcode[i + 1]
+                if next_title == "String":
+                    i = labels[next_val]
+                elif next_title == "Identifier":
+                    i = labels.get(vars.get(next_val, ""), i)
+                else:
+                    print("Syntax error: 'jmp' expects a label name")
+                    break
+                continue  # skip i += 1
+
+            # --- return ---
+            elif val == "ret":
+                i = retpos[-1]
+                retpos.remove(retpos[-1])
+                continue
+
+            # --- conditional jumps ---
+            elif val == "gj" and i + 1 < len(lexcode) and gt:
+                next_title, next_val = lexcode[i + 1]
+                if next_title == "String":
+                    i = labels[next_val]
+                elif next_title == "Identifier":
+                    i = labels.get(vars.get(next_val, ""), i)
+                continue
+
+            elif val == "lj" and i + 1 < len(lexcode) and lt:
+                next_title, next_val = lexcode[i + 1]
+                if next_title == "String":
+                    i = labels[next_val]
+                elif next_title == "Identifier":
+                    i = labels.get(vars.get(next_val, ""), i)
+                continue
+
+            elif val == "ej" and i + 1 < len(lexcode) and eq:
+                next_title, next_val = lexcode[i + 1]
+                if next_title == "String":
+                    i = labels[next_val]
+                elif next_title == "Identifier":
+                    i = labels.get(vars.get(next_val, ""), i)
+                continue
+            #elif val == "obj":
+            #    next_title, next_val = lexcode[i + 1]
+            #    nnext_title, nnext_val = lexcode[i + 2]
+            #    nnnext_title, nnnext_val = lexcode[i + 3]
+            #    if next_title != "String" or nnext_title != "String" or nnnext_title != "String":
+            #        break
+            #    if next_val == "text":
+            #        #text syntax
+            #        #(data)
+            #        #intray
+            #        #(ident)
+            #
+            #        intray.append(nnext_val)
+            #        textobj[nnext_val] = nnnext_val
+            #
+            #        pass
+            #    i = i + 3
+            #elif val == "flip":
+            #    arrylen = len(intray)
+            #    k = 0
+            #    while k < arrylen:
+            #        crrntitem = intray[k]
+            #        text = textobj[crrntitem]
+            #        #textarry = list(text)
+            #        #root.after(0, lambda t=text: text_widget.insert("end", t + "\n"))
+            #        text = text.replace("\\n", "\n")
+            #        root.after(0, lambda t=text: text_widget.insert("end", t))
+            #        k = k + 1
+            elif val == "system" and i + 1 < len(lexcode):
+                nt,nv = lexcode[i+1]
+                if nt == "String":
+                    os.system(nv)
+                if nt == "Identifier":
+                    os.system(vars[nv])
+                i = i + 1
+            elif val == "read":
+                nt,nv = lexcode[i+1]
+                nnt,nnv = lexcode[i+2]
+                if nt != "Identifier" or nnt != "Identifier":
+                    break
+                with open(vars[nnv], "r") as f:
+                    vars[nv] = f.read()
+                i = i + 2
+            #with open("demofile.txt", "w") as f:
+            #   f.write("Woops! I have deleted the content!")
+            #
+            elif val == "write":
+                nt,nv = lexcode[i+1]
+                nnt,nnv = lexcode[i+2]
+                if nt != "Identifier" or nnt != "Identifier":
+                    break
+                with open(vars[nnv], "w") as f:
+                    f.write(vars[nv])
+                i = i + 2
+            elif val == "arryset":
+                nt,nv = lexcode[i+1]
+                if nt != "Identifier":
+                    break
+                vars[nv] = []
+                i = i + 1
+            elif val == "arryadd":
+                nt,nv = lexcode[i+1]
+                nnt,nnv = lexcode[i+2]
+                if nt != "Identifier" or nnt != "Identifier":
+                    break
+                vars[nv].append(vars[nnv])
+                i = i + 2
+            elif val == "arrypop":
+                nt,nv = lexcode[i+1]
+                nnt,nnv = lexcode[i+2]
+                if nt != "Identifier" or nnt != "Identifier":
+                    break
+                vars[nv].pop(int(vars[nnv]))
+                i = i + 2
+            elif val == "arryfet":
+                nt,nv = lexcode[i+1]
+                nnt,nnv = lexcode[i+2]
+                nnnt,nnnv = lexcode[i+3]
+                if nt != "Identifier" or nnt != "Identifier" or nnnt != "Identifier":
+                    break
+                vars[nv] = vars[nnv][int(vars[nnnv])]
+                i = i + 3
+            elif val == "arrylen":
+                nt,nv = lexcode[i+1]
+                nnt,nnv = lexcode[i+2]
+                if nt != "Identifier" or nnt != "Identifier":
+                    break
+                vars[nv] = len((vars[nnv]))
+                i = i + 3
+
+        # ----------------------------
+        # Handle EOF
+        # ----------------------------
+        elif title == "EOF":
+            break
+
+        i += 1  # increment i if no jump/continue
+        #print(f'text: {textobj}')
+        #print(vars)
+        
+
+
+lexer(ParseStart(open(sys.argv[1]).read()))
+
+#print(type(machine(r"hello everyonee\b \nit is a nice\tday! \\")))

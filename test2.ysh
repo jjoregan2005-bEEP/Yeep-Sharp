@@ -1,0 +1,5 @@
+var dir "./test2"
+concat dir ".ysh"
+var fcont ""
+read fcont dir
+print fcont
